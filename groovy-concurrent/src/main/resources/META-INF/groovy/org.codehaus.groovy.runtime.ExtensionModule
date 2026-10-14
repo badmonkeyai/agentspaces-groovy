@@ -1,0 +1,3 @@
+moduleName=agentspaces-groovy-concurrent
+moduleVersion=0.3.0
+extensionClasses=ai.badmonkey.agentspaces.groovy.concurrent.ChannelExtensions,ai.badmonkey.agentspaces.groovy.concurrent.Dataflows

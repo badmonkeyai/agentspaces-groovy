@@ -1,0 +1,4 @@
+moduleName=agentspaces-groovy
+moduleVersion=0.3.0
+extensionClasses=ai.badmonkey.agentspaces.groovy.SpaceExtensions,ai.badmonkey.agentspaces.groovy.HandleExtensions,ai.badmonkey.agentspaces.groovy.ClientExtensions,ai.badmonkey.agentspaces.groovy.CoercionExtensions,ai.badmonkey.agentspaces.groovy.AsyncExtensions
+staticExtensionClasses=ai.badmonkey.agentspaces.groovy.StaticCoercionExtensions

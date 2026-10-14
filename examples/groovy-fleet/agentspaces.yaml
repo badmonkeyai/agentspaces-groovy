@@ -1,0 +1,13 @@
+# Example 21: the planner peer's configuration (PlannerApp reads it; the scripts configure themselves).
+agentspaces:
+  bind: 127.0.0.1:7593
+  tick-millis: 250
+  security:
+    profile: dev-local   # example 02's peers speak plain TCP
+  groups:
+    - name: research-fleet
+      founding: research-fleet-demo-v1
+      seeds: [127.0.0.1:7590]
+      spaces:
+        - name: tasks
+          settle-window-millis: 150

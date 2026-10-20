@@ -22,7 +22,7 @@
 
   <groupId>ai.badmonkey.agentspaces</groupId>
   <artifactId>agentspaces-groovy-parent</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
   <packaging>pom</packaging>
   <name>AgentSpaces Groovy :: Parent</name>
   <description>
@@ -86,7 +86,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <agentspaces.version>0.3.0</agentspaces.version>
+    <agentspaces.version>0.4.0</agentspaces.version>
     <!-- Apache Groovy 6.0.0, general availability 2026-09-19. The one property
          a Groovy bump changes (SRAD GR-Q-MNT-02). -->
     <groovy.version>6.0.0</groovy.version>
@@ -183,8 +183,14 @@
 
   <build>
     <resources>
+      <!-- The Groovy extension-module descriptor is copied after compilation (below): copied
+           before, the compiler's own extension scan finds it in target/classes, cannot load
+           the classes it names, and logs a warning with a stack trace per class. -->
       <resource>
         <directory>src/main/resources</directory>
+        <excludes>
+          <exclude>META-INF/groovy/**</exclude>
+        </excludes>
       </resource>
       <!-- The licence and notice travel inside every jar, under META-INF. -->
       <resource>
@@ -234,6 +240,13 @@
               <version>${groovy.version}</version>
               <scope>runtime</scope>
             </dependency>
+            <!-- For the Groovydoc jar the central-publish profile attaches. -->
+            <dependency>
+              <groupId>org.apache.groovy</groupId>
+              <artifactId>groovy-groovydoc</artifactId>
+              <version>${groovy.version}</version>
+              <scope>runtime</scope>
+            </dependency>
           </dependencies>
         </plugin>
         <plugin>
@@ -269,6 +282,32 @@
       </plugins>
     </pluginManagement>
     <plugins>
+      <!-- The extension-module descriptor lands once the Groovy classes exist and before the
+           tests run (process-classes follows compile). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>extension-module-descriptor</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/main/resources</directory>
+                  <includes>
+                    <include>META-INF/groovy/**</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <!-- The no-framework rule (SRAD GR-B-03): nothing from Micronaut, Spring,
            or LangChain4j reaches any classpath of this project, never the
            provided-scope Spring stubs, and never groovy-concurrent-java, which
@@ -322,7 +361,43 @@
     <!-- Maven Central publication, the same shape as the sibling projects. -->
     <profile>
       <id>central-publish</id>
+      <!-- gmavenplus finds the Groovydoc tool on the project's runtime classpath, so the module
+           carries it while the profile is active; optional keeps it out of the consumers' graphs,
+           and the profile is inactive in the published POM. -->
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.groovy</groupId>
+          <artifactId>groovy-groovydoc</artifactId>
+          <version>${groovy.version}</version>
+          <optional>true</optional>
+        </dependency>
+      </dependencies>
       <build>
+        <pluginManagement>
+          <plugins>
+            <!-- The modules are Groovy, so the -javadoc jar Central requires is a Groovydoc jar
+                 (gmavenplus attaches it under the javadoc classifier); maven-javadoc-plugin finds
+                 no Java sources here and attaches nothing. Managed, so it runs in the modules
+                 that declare the plugin and never in this parent. -->
+            <plugin>
+              <groupId>org.codehaus.gmavenplus</groupId>
+              <artifactId>gmavenplus-plugin</artifactId>
+              <executions>
+                <execution>
+                  <id>attach-groovydoc</id>
+                  <phase>package</phase>
+                  <goals>
+                    <goal>groovydoc-jar</goal>
+                  </goals>
+                  <configuration>
+                    <!-- Attach under the javadoc classifier Central looks for. -->
+                    <classifier>javadoc</classifier>
+                  </configuration>
+                </execution>
+              </executions>
+            </plugin>
+          </plugins>
+        </pluginManagement>
         <plugins>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
@@ -337,25 +412,6 @@
                 </goals>
               </execution>
             </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <version>${maven-javadoc-plugin.version}</version>
-            <executions>
-              <execution>
-                <id>attach-javadocs</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <quiet>true</quiet>
-              <doclint>all,-missing</doclint>
-              <release>${java.version}</release>
-            </configuration>
           </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>

@@ -3,8 +3,8 @@
 //   groovy worker.groovy [port] [seed-host:port]
 //
 // @Grab fetches the library (pin the version; a production peer is a built jar, see the README).
-@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.3.0')
-@Grab('ai.badmonkey.agentspaces:example-02-research-fleet:0.3.0')
+@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.4.0')
+@Grab('ai.badmonkey.agentspaces:example-02-research-fleet:0.4.0')
 import ai.badmonkey.agentspaces.examples.fleet.ResearchFleet.ResearchTask
 import ai.badmonkey.agentspaces.examples.fleet.ResearchFleet.Finding
 @groovy.transform.BaseScript ai.badmonkey.agentspaces.groovy.FleetScript _

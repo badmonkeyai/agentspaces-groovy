@@ -37,7 +37,7 @@ plain-Java runtime this project starts peers through lives in
 
 ```bash
 mvn -B -ntp verify                 # library and bridge
-mvn -B -ntp verify -Pexamples      # with example 21 (needs example-02-research-fleet 0.3.0 in the local repository)
+mvn -B -ntp verify -Pexamples      # with example 21 (needs example-02-research-fleet 0.4.0 in the local repository)
 mvn -B -ntp verify -Phosts         # with the Spring Boot and Micronaut passthroughs
 ci/grab-check.sh                   # after mvn install: the @Grab script under an installed Groovy 6
 ```

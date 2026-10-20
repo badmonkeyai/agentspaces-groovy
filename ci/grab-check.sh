@@ -18,7 +18,7 @@ fi
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 cat > "$WORK/grab.groovy" <<'SCRIPT'
-@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.3.0')
+@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.4.0')
 import ai.badmonkey.agentspaces.groovy.Fleet
 import ai.badmonkey.agentspaces.groovy.FleetScript
 

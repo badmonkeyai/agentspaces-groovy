@@ -36,7 +36,7 @@ jobs:
           java-version: '21'
           cache: maven
       - name: Build and test the library and the bridge, attach sources and javadoc
-        # The AgentSpaces 0.3.0 artifacts resolve from Maven Central. The example
+        # The AgentSpaces 0.4.0 artifacts resolve from Maven Central. The example
         # (-Pexamples) needs example-02-research-fleet, which is not published, and
         # the host passthroughs (-Phosts) need Micronaut on JDK 25; both run in the
         # workspace gate (verify-all.sh) rather than here. The publication profile

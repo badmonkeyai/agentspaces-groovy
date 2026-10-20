@@ -1,5 +1,71 @@
 # agentspaces-groovy
 
+## Introducing AgentSpaces by Bad Monkey AI
+
+**A peer-to-peer coordination fabric for agents, services, and the people who work with them.**
+
+AgentSpaces is a P2P framework to quickly discover and join P2P networks, where agents, software services, and people share assets, queries, results, and coordinate. The framework helps you build fleets of agents, tie in other software, and coordinate across them with a replicated tuple space, quorum building, and more. Agents post work, claim tasks, publish results, vote on decisions, and recover from each other's failures. There is no broker, no registry, no scheduler, and no server to keep alive. Coordination is peer-to-peer, secured end to end, and replicated across the fleet.
+
+## Quick start: build your first agent with Groovy
+
+An agent is a method. Its parameter is the work it takes, and its return value is the next entry in the space. In Groovy the agent is one closure per verb, and a single script is a whole peer: `fleet { }` configures it, `agent(...)` describes the worker, `bind` starts it, and `serve()` keeps it running.
+
+**1. Install Groovy 6.** Groovy 6.0.0 on JDK 21 or newer. `@Grab` fetches `agentspaces-groovy` from Maven Central at run time, so the script needs no build file.
+
+**2. Write the agent.** The two records live in the script under a package, so they carry the wire names `shop.Order#v1` and `shop.Shipment#v1`. The `fleet { }` block uses the same keys as the Spring starter's YAML. The default `mtls` security profile secures every link, so the block has no security entry.
+
+```groovy
+package shop
+
+@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.4.0')
+import ai.badmonkey.agentspaces.groovy.FleetScript
+@groovy.transform.BaseScript FleetScript _
+
+record Order(String orderId, String item) { }
+record Shipment(String orderId, String item, String by) { }
+
+int port = args ? args[0] as int : 7701
+String seed = args.size() > 1 ? args[1] : ''
+
+def runtime = fleet {
+    bind "127.0.0.1:$port"
+    group('shop') {
+        founding 'shop-v1'
+        if (seed) { seeds seed }
+        space('orders') { }
+    }
+}
+
+bind agent('fulfiller', description: 'Ships orders') {
+    take(Order, space: 'orders', lease: '30s', returns: Shipment) { Order order ->
+        new Shipment(order.orderId(), order.item(), 'fulfiller')
+    }
+}
+
+if (args.size() > 2) {                                   // groovy fulfiller.groovy 7702 127.0.0.1:7701 kite
+    def orders = runtime.context().group().space('orders')
+    orders << new Order('o-1', args[2])
+    println orders.read(Shipment, timeout: '30s').get()
+} else {
+    serve()
+}
+```
+
+**3. Run two instances.** The first founds the group on port 7701. The second takes its own port, the first instance as its seed, and an item to order.
+
+```
+groovy fulfiller.groovy
+groovy fulfiller.groovy 7702 127.0.0.1:7701 kite
+```
+
+The second instance prints the shipment. Either instance can take the order, because both run the same agent.
+
+**4. Kill one.** Add `println "shipping ${order.orderId()}"` and `Thread.sleep(10000)` at the top of the closure. Start both instances, write an order from the second, and run `kill -9` on whichever instance prints `shipping`. If you killed the first instance, the second prints the shipment. If you killed the second, the first prints `shipping o-1` again when the 30 second lease lapses.
+
+The sections below add the rest: the one-file peer in detail, the class form with compile-time checking, the Space API in Groovy, async verbs for Groovy 6's `await`, and a shell over a running peer.
+
+## About agentspaces-groovy
+
 AgentSpaces for Apache Groovy 6: the shared replicated tuple space
 and its peer-to-peer fabric in Groovy's own idiom. A Groovy class carrying the Java annotations already
 binds as a worker; this project builds on that floor. Let's use Groovy to quickly
@@ -14,14 +80,14 @@ build, leverage, and interact with our P2P agent collaboration space!
 <dependency>
   <groupId>ai.badmonkey.agentspaces</groupId>
   <artifactId>agentspaces-groovy</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
 </dependency>
 ```
 
 ```groovy
 // build.gradle
 dependencies {
-    implementation 'ai.badmonkey.agentspaces:agentspaces-groovy:0.3.0'
+    implementation 'ai.badmonkey.agentspaces:agentspaces-groovy:0.4.0'
     implementation 'org.apache.groovy:groovy:6.0.0'
 }
 ```
@@ -29,10 +95,133 @@ dependencies {
 Groovy 6.0.0 (general availability 2026-09-19) on JDK 21 or newer; the
 artifacts are Java 21 bytecode. 
 
+## How to use AI with AgentSpaces
+
+At the end of this section you will have run three fleets in one JVM: an
+agent written as closures on one peer that completes work a second peer
+writes; a worker that dies in the middle of a take, whose task comes back on
+its own and is finished by another worker; and two peers that vote on a
+proposal while the proposer awaits the decision with Groovy 6's `await`. Each
+snippet below is the body of one test method in
+`groovy/src/test/groovy/ai/badmonkey/agentspaces/groovy/ReadmeExamplesTest.groovy`,
+verbatim with the imports elided. The peers run on free loopback ports with no
+network and no model key, and `freePort()` and `until(timeout) { }` are the
+test's two helpers. Run all three with
+`cd agentspaces-groovy && mvn -q test -pl groovy -Dtest=ReadmeExamplesTest`.
+
+### 1. Build an agent and hand it work from another peer
+
+`agent(name) { }` describes a worker as one closure per verb; `Fleet.start { }`
+starts a peer from the same keywords as the starter's YAML. The second peer
+seeds from the first, writes a task, and reads the finding the agent's return
+value became. (`ReadmeExamplesTest.anAgentOnOnePeerTakesWhatAnotherPeerWrites`)
+
+```groovy
+int workerPort = freePort()
+worker = Fleet.start {                                               // peer one
+    bind "127.0.0.1:$workerPort"
+    tick '200ms'
+    group('it-fleet') { founding 'groovy-it-fleet-v1'; space('tasks') { settleWindow '100ms' } }
+}
+worker.bind agent('summarizer', description: 'Summarizes tasks') {   // the agent: one closure per verb
+    take(ItTask, space: 'tasks', lease: '30s', pollTimeout: '200ms', returns: ItFinding) { ItTask t ->
+        new ItFinding(t.topic(), "summary of ${t.topic()}")
+    }
+}
+
+client = Fleet.start {                                               // peer two, seeded from peer one
+    bind "127.0.0.1:${freePort()}"
+    tick '200ms'
+    group('it-fleet') { founding 'groovy-it-fleet-v1'; seeds "127.0.0.1:$workerPort"; space('tasks') { settleWindow '100ms' } }
+}
+def tasks = client.context().group().space('tasks')
+tasks << new ItTask('tuple spaces', 1)                               // peer two writes a task
+Optional<ItFinding> finding = tasks.read(ItFinding, timeout: '30s')  // peer one took it; its return is the next entry
+assert finding.get().summary() == 'summary of tuple spaces'
+```
+
+The space is the only thing the two peers share: no queue, no broker, and no
+URL for the agent. The take is a signed claim under a lease, so no other
+worker in the fleet sees the task while this one holds it.
+
+### 2. A crashed worker's take reappears
+
+A worker that takes a task and never finishes dies mid-take when its peer
+closes. Its lease lapses, the task reappears in the space, and a worker bound
+afterwards finishes it. No retry logic exists anywhere in this code.
+(`ReadmeExamplesTest.aCrashedWorkersTakeReappearsAndASecondWorkerFinishesIt`)
+
+```groovy
+int slowPort = freePort()
+slow = Fleet.start {
+    bind "127.0.0.1:$slowPort"; tick '200ms'
+    group('it-fleet') { founding 'groovy-it-fleet-v1'; space('tasks') { settleWindow '100ms' } }
+}
+slow.bind agent('slow-worker') {
+    take(ItTask, space: 'tasks', lease: '3s', pollTimeout: '200ms', returns: ItFinding) { ItTask t ->
+        Thread.sleep(60_000)                                         // a worker that never finishes
+        new ItFinding(t.topic(), 'never')
+    }
+}
+observer = Fleet.start {
+    bind "127.0.0.1:${freePort()}"; tick '200ms'
+    group('it-fleet') { founding 'groovy-it-fleet-v1'; seeds "127.0.0.1:$slowPort"; space('tasks') { settleWindow '100ms' } }
+}
+def tasks = observer.context().group().space('tasks')
+tasks << new ItTask('resilient', 1)
+assert until('20s') { tasks.count(ItTask) == 0 }                    // taken: no other worker can see it
+slow.close()                                                        // the worker dies mid-take
+assert until('30s') { tasks.count(ItTask) == 1 }                    // its lease lapsed: the task is back
+observer.bind agent('second-worker') {
+    take(ItTask, space: 'tasks', lease: '30s', pollTimeout: '200ms', returns: ItFinding) { ItTask t ->
+        new ItFinding(t.topic(), 'finished by the second worker')
+    }
+}
+assert tasks.read(ItFinding, timeout: '30s').get().summary() == 'finished by the second worker'
+```
+
+### 3. A fleet vote, awaited
+
+Each peer binds a reviewer whose `ballot` clause judges every proposal under
+the `ship:` prefix. The proposer asks for the decision first, as a
+`CompletableFuture` from the `decisionAsync` twin, proposes with a quorum of
+two, and `await`s the future; the tally shows one ballot from each peer.
+(`ReadmeExamplesTest.twoPeersVoteAndTheProposerAwaitsTheDecision`)
+
+```groovy
+int firstPort = freePort()
+first = Fleet.start {
+    bind "127.0.0.1:$firstPort"; tick '200ms'
+    group('it-fleet') { founding 'groovy-it-fleet-v1'; space 'tasks'; space 'votes' }
+}
+second = Fleet.start {
+    bind "127.0.0.1:${freePort()}"; tick '200ms'
+    group('it-fleet') { founding 'groovy-it-fleet-v1'; seeds "127.0.0.1:$firstPort"; space 'tasks'; space 'votes' }
+}
+[first, second].each { peer ->                                      // one reviewer per peer
+    peer.bind agent('reviewer') {
+        ballot(space: 'votes', prefix: 'ship:') { VoteCapability.Proposal p ->
+            p.question().contains('tests') ? 'yes' : 'no'
+        }
+    }
+}
+VoteClient votes = second.spaces().group('it-fleet').capability(VoteClient)
+def decision = votes.decisionAsync('ship:release-1')                // a CompletableFuture, before any proposal
+votes.propose(id: 'ship:release-1', question: 'Ship once the tests pass?', options: ['yes', 'no'], quorum: 2)
+VoteCapability.Decision decided = await decision                   // Groovy 6's await on the twin
+assert decided.winner() == 'yes'
+assert votes.tally('ship:release-1').yes == 2                      // one ballot from each peer
+```
+
+Every blocking verb and client wait has an `Async` twin like `decisionAsync`,
+so a bound body can fan out under `AsyncScope` and await several at once (see
+"Async" below). The one-file `@Grab` form of the first example is the next
+section.
+
 ## A one-file peer
 
 ```groovy
-@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.3.0')
+@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.4.0')
 import ai.badmonkey.agentspaces.examples.fleet.ResearchFleet.ResearchTask
 import ai.badmonkey.agentspaces.examples.fleet.ResearchFleet.Finding
 @groovy.transform.BaseScript ai.badmonkey.agentspaces.groovy.FleetScript _

@@ -33,6 +33,7 @@ import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.Timeout
 
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 
@@ -122,6 +123,7 @@ class AsyncTest {
         Space tasks = space('tasks')
         Space data = space('data')
         Space findings = space('findings')
+        AtomicBoolean threw = new AtomicBoolean()
         def planner = agent('planner') {
             take(ItTask, space: 'tasks', lease: '3s', pollTimeout: 'PT0.2S', where: ['priority=9'], resultSpace: 'findings', returns: ItFinding) { ItTask t ->
                 AsyncScope.withScope { scope ->
@@ -133,18 +135,23 @@ class AsyncTest {
                 }
             }
             take(ItTask, space: 'tasks', lease: '2s', pollTimeout: 'PT0.2S', where: ['priority=8'], returns: ItFinding) { ItTask t ->
-                AsyncScope.withScope { scope ->
-                    // A cancelled twin's blocking call still runs to its own timeout (the binder renews the take
-                    // lease meanwhile), so a fan-out keeps its timeouts short.
-                    def slow = scope.async { await data.readAsync(ItTally, timeout: '3s', where: [topic: 'never-written']) }
-                    def failing = scope.async { throw new IllegalStateException('fan-out failed') }
-                    def f = await failing
-                    def sl = await slow
-                    new ItFinding(t.topic(), 'never')
+                try {
+                    AsyncScope.withScope { scope ->
+                        // A cancelled twin's blocking call still runs to its own timeout (the binder renews the take
+                        // lease meanwhile), so a fan-out keeps its timeouts short.
+                        def slow = scope.async { await data.readAsync(ItTally, timeout: '3s', where: [topic: 'never-written']) }
+                        def failing = scope.async { throw new IllegalStateException('fan-out failed') }
+                        def f = await failing
+                        def sl = await slow
+                        new ItFinding(t.topic(), 'never')
+                    }
+                } catch (Throwable e) {
+                    threw.set(true)
+                    throw e
                 }
             }
         }
-        runtime.bind(planner)
+        def bound = runtime.bind(planner)
 
         data << new ItTally('plan', 7) << new ItFinding('plan', 'ok')
         tasks << new ItTask('plan', 9)
@@ -152,6 +159,10 @@ class AsyncTest {
 
         tasks << new ItTask('doomed', 8)
         assertThat(Fleets.await(Duration.ofSeconds(10)) { tasks.count(ItTask, where: [topic: 'doomed']) == 0 }).as('taken').isTrue()
+        assertThat(Fleets.await(Duration.ofSeconds(15)) { threw.get() }).as('the body threw').isTrue()
+        // The planner's own loop would take the lapsed task again within one poll, which leaves the
+        // observer a window shorter than its own; unbinding first means nothing renews or re-takes.
+        bound.each { it.close() }
         assertThat(Fleets.await(Duration.ofSeconds(30)) { tasks.count(ItTask, where: [topic: 'doomed']) == 1 }).as('the lease lapsed after the body threw').isTrue()
         assertThat(findings.all(ItFinding, where: [topic: 'doomed'])).isEmpty()
     }

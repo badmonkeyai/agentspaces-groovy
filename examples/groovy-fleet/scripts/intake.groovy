@@ -3,9 +3,9 @@
 //   groovy intake.groovy topics.csv report.md [port] [seed-host:port]
 //
 // The CSV and Markdown modules are incubating in Groovy 6.0; this script is where the example uses them.
-@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.3.0')
-@Grab('ai.badmonkey.agentspaces:agentspaces-groovy-concurrent:0.3.0')
-@Grab('ai.badmonkey.agentspaces:example-02-research-fleet:0.3.0')
+@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.4.0')
+@Grab('ai.badmonkey.agentspaces:agentspaces-groovy-concurrent:0.4.0')
+@Grab('ai.badmonkey.agentspaces:example-02-research-fleet:0.4.0')
 @Grab('org.apache.groovy:groovy-csv:6.0.0')
 @Grab('org.apache.groovy:groovy-markdown:6.0.0')
 import ai.badmonkey.agentspaces.examples.fleet.ResearchFleet.ResearchTask

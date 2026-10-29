@@ -57,6 +57,11 @@
       <groupId>ai.badmonkey.agentspaces</groupId>
       <artifactId>agentspaces-capabilities</artifactId>
     </dependency>
+    <!-- The content swarm (srad/large-networks-bulk-data.md): ContentExtensions over Content and Fetch. -->
+    <dependency>
+      <groupId>ai.badmonkey.agentspaces</groupId>
+      <artifactId>agentspaces-content</artifactId>
+    </dependency>
     <!-- YAML configuration files for Fleet.start(Path). -->
     <dependency>
       <groupId>com.fasterxml.jackson.dataformat</groupId>

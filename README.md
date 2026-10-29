@@ -298,7 +298,20 @@ space.use(Task, lease: '10m') { TakenEntry<Task> taken -> ... }  // take, run, c
 space.notify(Task, lease: '1h', on: 'written') { SpaceEvent e -> ... }   // Subscription
 votes.propose(id: 'm-1', question: 'ship?', options: ['yes', 'no'], quorum: 2); votes.cast('m-1', 'yes')
 aggregate.settled('epoch', ticks: 20, tolerance: 0.01)
+content.publish(file, name: 'weights.bin', pieceSize: '1m')          // group.content: the content swarm (content { enabled } in the fleet DSL)
+content.fetch(root, timeout: '10m') { Fetch f -> f.bytes }             // from every holder at once; f.text, f.progress(), f.trace()
+space << bigEntry                                                     // above content.escalateAbove (4 MiB) the entry travels as an artifact
 ```
+
+`group.content` is the group's content swarm (SPEC v0.1.23 §8,
+`srad/large-networks-bulk-data.md`) once `content { enabled }` is in the
+fleet block (with `pieceSize`, `escalateAbove`, `store { backends 'file';
+path '...' }` and the other `agentspaces.content.*` keywords): `publish`
+takes bytes, a `File`, a `Path` or a path string with `name:`, `mediaType:`,
+`pieceSize:`, `lease:`, `attrs:`, `inPlace:`; `fetch` with a closure waits
+up to `timeout:` and hands the closure the completed `Fetch`, whose `bytes`
+and `text` read the artifact; a `Fetch` also takes `await('2m')`. In a
+script, `content()` is the one joined group's swarm.
 
 `where:` takes a plain value (`eq`), a matcher function (`eq`, `ne`, `gt`,
 `gte`, `lt`, `lte`, `anyOf` for the Java `in`, `contains`, `isNull`, `notNull`,
@@ -393,7 +406,7 @@ serves; closing it closes the peer. Needs `org.apache.groovy:groovy-groovysh`
 ## Building
 
 ```bash
-mvn -B -ntp verify                         # the library and the bridge: 63 and 7 tests
+mvn -B -ntp verify                         # the library and the bridge: 66 and 7 tests
 mvn -B -ntp verify -Pexamples              # plus example 21 (examples/groovy-fleet), on example 02's fleet
 mvn -B -ntp verify -Phosts                 # plus the Spring Boot and Micronaut passthroughs
 ci/grab-check.sh                           # the @Grab script against an installed Groovy 6 and the local repository

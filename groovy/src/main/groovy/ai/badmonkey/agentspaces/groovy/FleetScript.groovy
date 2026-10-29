@@ -18,6 +18,7 @@ package ai.badmonkey.agentspaces.groovy
 import ai.badmonkey.agentspaces.agent.AgentBinder
 import ai.badmonkey.agentspaces.agent.AgentSpaces
 import ai.badmonkey.agentspaces.api.space.Space
+import ai.badmonkey.agentspaces.content.Content
 import ai.badmonkey.agentspaces.runtime.FleetContext
 import ai.badmonkey.agentspaces.runtime.FleetRuntime
 import groovy.transform.CompileStatic
@@ -160,6 +161,11 @@ abstract class FleetScript extends Script {
     /** A space of the one joined group, or of {@code groupName} when named. */
     Space space(String name, String groupName = null) {
         group(groupName).space(name)
+    }
+
+    /** The content swarm of the one joined group, or of {@code groupName} when named ({@code content { enabled }}). */
+    Content content(String groupName = null) {
+        ContentExtensions.getContent(group(groupName))
     }
 
     /** {@code agent('pricer', description: '...') { take(Task, space: 'tasks') { Task t -> ... } }}: the agent DSL. */

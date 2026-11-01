@@ -17,7 +17,7 @@ An agent is a method. Its parameter is the work it takes, and its return value i
 ```groovy
 package shop
 
-@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.4.0')
+@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.5.0')
 import ai.badmonkey.agentspaces.groovy.FleetScript
 @groovy.transform.BaseScript FleetScript _
 
@@ -80,14 +80,14 @@ build, leverage, and interact with our P2P agent collaboration space!
 <dependency>
   <groupId>ai.badmonkey.agentspaces</groupId>
   <artifactId>agentspaces-groovy</artifactId>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 
 ```groovy
 // build.gradle
 dependencies {
-    implementation 'ai.badmonkey.agentspaces:agentspaces-groovy:0.4.0'
+    implementation 'ai.badmonkey.agentspaces:agentspaces-groovy:0.5.0'
     implementation 'org.apache.groovy:groovy:6.0.0'
 }
 ```
@@ -221,7 +221,7 @@ section.
 ## A one-file peer
 
 ```groovy
-@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.4.0')
+@Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.5.0')
 import ai.badmonkey.agentspaces.examples.fleet.ResearchFleet.ResearchTask
 import ai.badmonkey.agentspaces.examples.fleet.ResearchFleet.Finding
 @groovy.transform.BaseScript ai.badmonkey.agentspaces.groovy.FleetScript _

@@ -22,7 +22,7 @@
 
   <groupId>ai.badmonkey.agentspaces</groupId>
   <artifactId>agentspaces-groovy-parent</artifactId>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
   <packaging>pom</packaging>
   <name>AgentSpaces Groovy :: Parent</name>
   <description>
@@ -86,7 +86,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <agentspaces.version>0.4.0</agentspaces.version>
+    <agentspaces.version>0.5.0</agentspaces.version>
     <!-- Apache Groovy 6.0.0, general availability 2026-09-19. The one property
          a Groovy bump changes (SRAD GR-Q-MNT-02). -->
     <groovy.version>6.0.0</groovy.version>

@@ -44,6 +44,7 @@ class FleetShellTest {
 
         AgentSpacesProperties serving = FleetShell.properties(['-e', "bind '127.0.0.1:7598'; console { enabled() }; group('g') { founding 'f'; space 'tasks' }"])
         assertThatThrownBy { FleetShell.refuseServing(serving) }.hasMessageContaining('console.enabled').hasMessageContaining('serves nothing')
+                .hasMessageContaining('does not start the fleet console').hasMessageContaining('Spring Boot starter')
         AgentSpacesProperties gateway = FleetShell.properties(['-e', "bind '127.0.0.1:7598'; a2a { enabled() }; group('g') { founding 'f'; space 'tasks' }"])
         assertThatThrownBy { FleetShell.refuseServing(gateway) }.hasMessageContaining('a2a.enabled')
         FleetShell.refuseServing(fromDsl)

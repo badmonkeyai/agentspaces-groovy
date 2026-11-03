@@ -76,6 +76,12 @@ abstract class FleetScript extends Script {
         started(Fleet.start(dsl))
     }
 
+    /** Starts the peer from the fleet DSL with the runtime's options, a block over {@code FleetRuntime.Builder}. */
+    FleetRuntime fleet(@DelegatesTo(value = FleetBuilder, strategy = Closure.DELEGATE_FIRST) Closure<?> dsl,
+                       @DelegatesTo(value = FleetRuntime.Builder, strategy = Closure.DELEGATE_FIRST) Closure<?> runtime) {
+        started(Fleet.start(dsl, runtime))
+    }
+
     /** Starts the peer from a YAML file. */
     FleetRuntime fleet(Path yaml) {
         started(Fleet.start(yaml))

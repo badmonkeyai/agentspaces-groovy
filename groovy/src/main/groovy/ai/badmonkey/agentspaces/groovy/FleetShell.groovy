@@ -57,7 +57,7 @@ final class FleetShell {
     static int start(String... args) {
         AgentSpacesProperties properties = properties(args.toList())
         refuseServing(properties)
-        FleetRuntime runtime = FleetRuntime.start(properties)
+        FleetRuntime runtime = Fleet.builder(properties).start()
         try {
             System.err.println(banner(runtime))
             return open(runtime)
@@ -85,13 +85,21 @@ final class FleetShell {
         PropertiesLoader.yaml(path)
     }
 
-    /** GR-O-01: the shell never serves. */
+    /**
+     * GR-O-01: the shell never serves. The runtime it starts could not in
+     * any case: {@code FleetRuntime} does not start the console or the A2A
+     * gateway, the Spring Boot starter's auto-configurations do.
+     */
     static void refuseServing(AgentSpacesProperties properties) {
         if (properties.console.enabled) {
-            throw new IllegalArgumentException('FleetShell refuses a configuration with console.enabled: a shell acts as the operator and serves nothing; run the console in its own peer')
+            throw new IllegalArgumentException('FleetShell refuses a configuration with console.enabled: a shell acts as the operator and serves nothing,'
+                    + ' and the runtime it starts (FleetRuntime) does not start the fleet console in any case; run the console peer under the'
+                    + ' Spring Boot starter (AgentSpacesConsoleAutoConfiguration)')
         }
         if (properties.a2a.enabled) {
-            throw new IllegalArgumentException('FleetShell refuses a configuration with a2a.enabled: a shell acts as the operator and serves nothing; run the gateway in its own peer')
+            throw new IllegalArgumentException('FleetShell refuses a configuration with a2a.enabled: a shell acts as the operator and serves nothing,'
+                    + ' and the runtime it starts (FleetRuntime) does not start the A2A gateway in any case; run the gateway peer under the'
+                    + ' Spring Boot starter (AgentSpacesA2aAutoConfiguration)')
         }
     }
 

@@ -35,7 +35,10 @@ import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
 
 import static ai.badmonkey.agentspaces.groovy.Where.anyOf
+import static ai.badmonkey.agentspaces.groovy.Where.eq
 import static ai.badmonkey.agentspaces.groovy.Where.gte
+import static ai.badmonkey.agentspaces.groovy.Where.lt
+import static ai.badmonkey.agentspaces.groovy.Where.ne
 import static ai.badmonkey.agentspaces.groovy.Where.present
 import static org.assertj.core.api.Assertions.assertThat
 import static org.assertj.core.api.Assertions.assertThatThrownBy
@@ -47,11 +50,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ExtensionsTest {
 
+    /** An entry with a long and a double component, for the numeric-bound row. */
+    record ItReading(String topic, long count, double ratio) {}
+
     private FleetRuntime runtime
 
     @BeforeAll
     void start() {
-        runtime = Fleets.start(Fleets.freePort(), 0, 'write', 'read', 'take', 'lapse', 'notify', 'ginq', 'use')
+        runtime = Fleets.start(Fleets.freePort(), 0, 'write', 'read', 'take', 'lapse', 'notify', 'ginq', 'use', 'numbers')
     }
 
     @AfterAll
@@ -123,6 +129,23 @@ class ExtensionsTest {
             select t.topic()
         }
         assertThat(hot.toList()).containsExactly('t5', 't4')
+    }
+
+    @Test
+    void numericBoundsMatchByValueWhateverTheFieldsBoxedClass() {
+        // review-110226-deadcode-parity C6: an int bound in the DSL against a long or a double component.
+        // The core's Matchers compare numbers by value (0.5.0); Where passes the bound through as written.
+        Space s = space('numbers')
+        s << new ItReading('a', 1L, 1.5d) << new ItReading('b', 2L, 2.0d) << new ItReading('c', 3L, 2.5d)
+
+        assertThat(s.all(ItReading, where: [count: gte(2)])*.topic()).as('gte(2) on a long field').containsExactlyInAnyOrder('b', 'c')
+        assertThat(s.read(ItReading, where: [ratio: eq(2)])).as('eq(2) on a double field').hasValueSatisfying { assertThat(it.topic()).isEqualTo('b') }
+        assertThat(s.all(ItReading, where: [ratio: 2])*.topic()).as('a plain value is eq').containsExactly('b')
+        assertThat(s.all(ItReading, where: [count: ne(2)])*.topic()).containsExactlyInAnyOrder('a', 'c')
+        assertThat(s.all(ItReading, where: [ratio: lt(2)])*.topic()).containsExactly('a')
+        assertThat(s.all(ItReading, where: [count: anyOf(1, 3)])*.topic()).as('anyOf over a long field').containsExactlyInAnyOrder('a', 'c')
+        assertThat(s.all(ItReading, where: [count: gte(2L), ratio: lt(2.5d)])*.topic()).as('bounds of the field\'s own class still match').containsExactly('b')
+        assertThat(s.take(ItReading, timeout: '2s', where: [count: gte(3)])).as('a take claim judged by the fabric').hasValueSatisfying { assertThat(it.entry().topic()).isEqualTo('c') }
     }
 
     @Test

@@ -44,12 +44,22 @@ import java.time.Duration
  *         space('tasks') { strategy 'LEASE_RACE'; admission 'credential' }
  *         space 'findings'
  *     }
- *     capabilities { orderedLog(); votesSpace 'votes' }
+ *     capabilities { votesSpace 'votes' }
  * }
  * </pre>
  *
  * An unknown keyword fails at the DSL with the keyword, this level's known
  * keywords, and the nearest ones by spelling.
+ *
+ * <p>Three keywords are the starter's and do nothing here. The starter
+ * refuses {@code capabilities { orderedLog() }} ({@code ordered-log=true}),
+ * because the ordered log runs over a fixed member set it cannot infer; the
+ * hand-wired form is {@code OrderedTakes.over(group.pipes(), codec, identity,
+ * 'app', members, clock, seed, space)} followed by {@code group.ordered(name,
+ * ordered)}, as {@code AnnotationPassthroughTest.wireOrdered} shows.
+ * {@code console { enabled }} and {@code a2a { enabled }} are refused by
+ * {@link Fleet#start} itself: the runtime does not serve the console or the
+ * A2A gateway, the Spring Boot starter does.
  */
 @CompileStatic
 class FleetBuilder {

@@ -22,7 +22,7 @@ import java.time.Duration
 
 /**
  * The coercions as Groovy methods: {@code '10m' as Duration}, {@code 600_000 as Lease},
- * {@code record.toMap()}, and the static {@code Lease.of('10m')}.
+ * {@code record.toMap()}, {@code Task.from(map)}, and the static {@code Lease.of('10m')}.
  */
 @CompileStatic
 final class CoercionExtensions {
@@ -63,5 +63,19 @@ final class CoercionExtensions {
     /** A record's components as an ordered map. */
     static Map<String, Object> toMap(Record self) {
         Coercions.map(self)
+    }
+
+    /**
+     * {@code Task.from(map)}: a record from a map by component name, with
+     * {@link Coercions#record}'s widening and refusals. This is an extension
+     * on {@code Class<T>}, the way Groovy's own {@code Foo.newInstance()} is:
+     * a call on a class with no such static method falls back to the methods
+     * of {@code java.lang.Class}, so every record class gains it, and a class
+     * with its own {@code from} keeps that. A static extension could not do
+     * this, because Groovy passes {@code null} for the self argument of a
+     * static extension method and the record class would be unknown.
+     */
+    static <T> T from(Class<T> self, Map<String, ?> values) {
+        Coercions.record(self, values)
     }
 }

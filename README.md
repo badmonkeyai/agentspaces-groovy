@@ -222,6 +222,7 @@ section.
 
 ```groovy
 @Grab('ai.badmonkey.agentspaces:agentspaces-groovy:0.5.0')
+@Grab('ai.badmonkey.agentspaces:example-02-research-fleet:0.5.0')   // the two records below; unpublished, see the note
 import ai.badmonkey.agentspaces.examples.fleet.ResearchFleet.ResearchTask
 import ai.badmonkey.agentspaces.examples.fleet.ResearchFleet.Finding
 @groovy.transform.BaseScript ai.badmonkey.agentspaces.groovy.FleetScript _
@@ -251,7 +252,12 @@ until SIGINT or `stop()`; when the script body ends, the agents are unbound and
 the peer closes (an in-flight take then lapses at its lease, the binder's crash
 idiom). `@Grab` is a development convenience: pin the version, and ship a built
 jar or a Maven or Gradle project in production, because a script runs whatever
-a repository serves.
+a repository serves. The second `@Grab` names `example-02-research-fleet`,
+the core reactor's example module that declares `ResearchTask` and `Finding`;
+that artifact is not published to Maven Central, so install it from a checkout
+of the core (`mvn -q install -DskipTests` in `agentspaces/`) or replace the two
+imports with records of your own, as the quick start above does.
+`examples/groovy-fleet/scripts/worker.groovy` is this script in full.
 
 ## The class form
 
@@ -274,8 +280,8 @@ The Java annotations on a Groovy class, dynamic or `@CompileStatic`, bind
 through `FleetRuntime.bind`, `AgentSpaces.bind`, the Spring Boot starter, or
 the Micronaut library unchanged. With `FleetChecker` enabled, a `where` entry
 that names no component of the cue record, a lease that does not parse, a
-`@Ballot` that returns anything but `String`, or `@Memoized` beside a verb fail
-at compile time with the binder's own words. 
+`@Ballot` that returns anything but `String`, or `@Memoized` or `@ActiveMethod`
+beside a verb fail at compile time with the binder's own words.
 
 Prefer the class form for anything that ships in a jar or runs under a host; the DSL for scripts, tests, and
 agents assembled at run time. Both publish the same card.
@@ -308,7 +314,9 @@ space << bigEntry                                                     // above c
 fleet block (with `pieceSize`, `escalateAbove`, `store { backends 'file';
 path '...' }` and the other `agentspaces.content.*` keywords): `publish`
 takes bytes, a `File`, a `Path` or a path string with `name:`, `mediaType:`,
-`pieceSize:`, `lease:`, `attrs:`, `inPlace:`; `fetch` with a closure waits
+`pieceSize:`, `lease:`, `attrs:`, `inPlace:` (a size is `'1m'`, `'256k'`, or a
+number of bytes here; the Clojure binding spells the same size `"1MiB"`);
+`fetch` with a closure waits
 up to `timeout:` and hands the closure the completed `Fetch`, whose `bytes`
 and `text` read the artifact; a `Fetch` also takes `await('2m')`. In a
 script, `content()` is the one joined group's swarm.
@@ -319,6 +327,19 @@ script, `content()` is the one joined group's swarm.
 `read`, `all`, `entries`, and `notify` runs after the template matched, on
 this replica only; a take claim is judged by the fabric's template, so `take`
 takes `where:` and `tags:` and no filter closure.
+
+Numbers in filters compare by value whatever their boxed class: `gte(2)`
+matches a `long` component and `eq(2)` a `double` component holding 2.0,
+because the core's matchers compare numerically since 0.5.0
+(`ExtensionsTest.numericBoundsMatchByValueWhateverTheFieldsBoxedClass`).
+
+Every record class gains `from(map)`: `Task.from([topic: 'x', priority: 3])`
+builds the record through its canonical constructor by component name, with
+numeric widening and string-to-enum coercion, and refuses an unknown key or a
+missing primitive component by name; `record.toMap()` is the way back. The
+method is an extension on `Class<T>`, the way Groovy's own `Foo.newInstance()`
+is, so it works dynamically and under `@CompileStatic`, and a class that has
+its own static `from` keeps it.
 
 ## Async
 
@@ -372,6 +393,36 @@ and methods resolve inside a block; a local named like a keyword shadows it,
 as Groovy scoping has it. `Fleet.start(Path)`, `Fleet.start(String yaml)`, and
 `Fleet.start(Map)` take the other forms.
 
+Every form takes a second, optional block over the runtime's own options,
+which delegates to `FleetRuntime.Builder`: `participant` (a `FleetParticipant`
+started after the node ticks and stopped on close), `clock`, `scheduler`,
+`embedder`, `schemaRegistry`, and `identity`. In a script, `fleet({ }) { }`
+is the same pair.
+
+```groovy
+def runtime = Fleet.start({
+    bind '127.0.0.1:7591'
+    group('research') { seeds '127.0.0.1:7590'; space 'tasks' }
+}) {
+    participant modelServer                 // FleetRuntime.Builder.participant
+    clock InstantSource.system()            // FleetRuntime.Builder.clock
+}
+```
+
+The runtime builds the peer from the Spring Boot starter's own build methods
+with no Spring context, so three starter features have no hook in the DSL.
+`capabilities { orderedLog() }` is a keyword the starter refuses
+(`ordered-log=true`), because the ordered log runs over a fixed member set
+the starter cannot infer; the hand-wired form is `OrderedTakes.over(...)` and
+`group.ordered(name, ordered)`, as `AnnotationPassthroughTest.wireOrdered`
+shows. `console { enabled }` and `a2a { enabled }` are keywords `Fleet.start`
+refuses, naming the starter: the runtime does not serve the fleet console or
+the A2A gateway, the starter's auto-configurations do. `BeaconLocator` beans
+and `PeerNodeCustomizer`s are Spring beans with no runtime equivalent; the
+runtime joins with each group's seeds, multicast when enabled, and the default
+bootstrap chain. `capabilities { gossipLearn() }` gives the same learner the
+starter builds, pure averaging with no metrics space.
+
 ## The shell
 
 ```
@@ -384,8 +435,9 @@ fleet> space('tasks') << new ResearchTask('agentic memory', 3)
 `fleet`, `spaces`, `space(name)`, `group(name)`, `agent(name) { }`, and
 `bind(agent)` are bound; the shell runs as the configured identity and refuses
 a configuration that enables the console or the A2A gateway, so it never
-serves; closing it closes the peer. Needs `org.apache.groovy:groovy-groovysh`
-(an optional dependency).
+serves (and the runtime it starts could not serve them in any case; the Spring
+Boot starter does); closing it closes the peer. Needs
+`org.apache.groovy:groovy-groovysh` (an optional dependency).
 
 ## Groovy constructs that meet the binder
 
@@ -406,7 +458,7 @@ serves; closing it closes the peer. Needs `org.apache.groovy:groovy-groovysh`
 ## Building
 
 ```bash
-mvn -B -ntp verify                         # the library and the bridge: 66 and 7 tests
+mvn -B -ntp verify                         # the library and the bridge: 72 and 7 tests (60 @Test methods plus FleetCheckerTest's 12 parameterized refusal rows; 7 @Test methods)
 mvn -B -ntp verify -Pexamples              # plus example 21 (examples/groovy-fleet), on example 02's fleet
 mvn -B -ntp verify -Phosts                 # plus the Spring Boot and Micronaut passthroughs
 ci/grab-check.sh                           # the @Grab script against an installed Groovy 6 and the local repository

@@ -18,6 +18,7 @@ package ai.badmonkey.agentspaces.groovy
 import ai.badmonkey.agentspaces.groovy.support.Fleets
 import ai.badmonkey.agentspaces.groovy.support.ItFinding
 import ai.badmonkey.agentspaces.groovy.support.ItTask
+import ai.badmonkey.agentspaces.runtime.FleetParticipant
 import ai.badmonkey.agentspaces.runtime.FleetRuntime
 import ai.badmonkey.agentspaces.runtime.PropertiesLoader
 import ai.badmonkey.agentspaces.spring.AgentSpacesProperties
@@ -25,6 +26,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 
 import java.time.Duration
+import java.time.InstantSource
+import java.util.concurrent.CopyOnWriteArrayList
 
 import static org.assertj.core.api.Assertions.assertThat
 import static org.assertj.core.api.Assertions.assertThatThrownBy
@@ -134,6 +137,56 @@ class FleetDslTest {
 
     private String seedOf(int port) {
         "127.0.0.1:$port"
+    }
+
+    /** A participant that records its lifecycle, for the runtime block. */
+    static class Recorder implements FleetParticipant {
+        final List<String> log = new CopyOnWriteArrayList<>()
+
+        @Override
+        void start() { log << 'start' }
+
+        @Override
+        void stop() { log << 'stop' }
+    }
+
+    @Test
+    @Timeout(60L)
+    void theRuntimeBlockFeedsFleetRuntimeBuilderAndAnUnservedKeyIsRefusedNamingTheStarter() {
+        // review-110226-deadcode-parity C7: what FleetRuntime.Builder exposes reaches the DSL; what it does not is refused.
+        Recorder recorder = new Recorder()
+        InstantSource ticking = InstantSource.system()
+        FleetRuntime runtime = Fleet.start({
+            bind "127.0.0.1:${Fleets.freePort()}"
+            tick '200ms'
+            group('it-fleet') { founding 'groovy-it-fleet-v1'; space 'tasks' }
+        }) {
+            participant recorder
+            clock ticking
+        }
+        try {
+            assertThat(runtime.clock()).isSameAs(ticking)
+            assertThat(recorder.log).containsExactly('start')
+            assertThat(runtime.context().group().space('tasks').name()).isEqualTo('tasks')
+        } finally {
+            runtime.close()
+        }
+        assertThat(recorder.log).containsExactly('start', 'stop')
+
+        assertThatThrownBy { Fleet.start { bind '127.0.0.1:7597'; console { enabled() }; group('g') { founding 'f'; space 'tasks' } } }
+                .hasMessageContaining('agentspaces.console.enabled=true')
+                .hasMessageContaining('does not start the fleet console')
+                .hasMessageContaining('Spring Boot starter')
+        assertThatThrownBy {
+            Fleet.start('''
+                agentspaces:
+                  bind: 127.0.0.1:7597
+                  a2a: { enabled: true }
+                  groups: [{ name: g, founding: f, spaces: [{ name: tasks }] }]
+                '''.stripIndent())
+        }.hasMessageContaining('agentspaces.a2a.enabled=true').hasMessageContaining('A2A gateway')
+        assertThatThrownBy { Fleet.builder(Fleet.properties { console { enabled() } }) }.hasMessageContaining('console.enabled')
+        assertThat(Fleet.tree { console { enabled() } }).as('the DSL still spells the starter\'s key; start refuses it').containsEntry('console', [enabled: true])
     }
 
     @Test

@@ -38,6 +38,11 @@ import java.util.function.Predicate
  *
  * A plain value in a {@code where:} map means {@code eq}; a closure means
  * {@code predicate} over the field's value; a {@code Matcher} passes through.
+ * Numbers compare by value whatever their boxed class, so {@code gte(2)}
+ * matches a {@code long} field and {@code eq(2)} a {@code double} field
+ * holding 2.0: the core's {@code Matchers.comparing}, {@code eq}, {@code ne},
+ * and {@code in} compare numerically since 0.5.0, and this class passes the
+ * bound through unchanged.
  * The filter closure of {@code read}, {@code all}, {@code entries}, and
  * {@code notify} runs after the template matched, on this replica; a take
  * claim is judged by the fabric's template alone, so {@code take} accepts

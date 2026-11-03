@@ -17,6 +17,7 @@ package ai.badmonkey.agentspaces.groovy
 
 import ai.badmonkey.agentspaces.api.space.Lease
 import ai.badmonkey.agentspaces.groovy.support.ItTask
+import groovy.transform.CompileStatic
 import org.junit.jupiter.api.Test
 
 import java.time.Duration
@@ -69,5 +70,22 @@ class CoercionsTest {
         assertThatThrownBy { Coercions.record(ItTask, [topic: 'x']) }.hasMessageContaining('priority').hasMessageContaining('required')
         assertThatThrownBy { Coercions.record(ItTask, [topic: 'x', priority: 'three']) }.hasMessageContaining('priority')
         assertThatThrownBy { Coercions.record(String, [:]) }.hasMessageContaining('not a record')
+    }
+
+    @Test
+    void everyRecordClassGainsFromAsGroovyClassesGainNewInstance() {
+        // review-110226-deadcode-parity C8: Task.from(map) is the README's form; an extension on Class<T>, dynamic and static.
+        assertThat(ItTask.from([topic: 'x', priority: 3])).isEqualTo(new ItTask('x', 3))
+        assertThat(Nested.from([name: 'n', inner: [depth: 2], level: 'HIGH', big: 7, ratio: 1]))
+                .isEqualTo(new Nested('n', new Inner(2), Level.HIGH, 7L, 1.0d))
+        assertThat(staticallyCompiledFrom()).isEqualTo(new ItTask('s', 1))
+        assertThat(ItTask.from([topic: 'y', priority: 2]).toMap()).containsExactly(Map.entry('topic', 'y'), Map.entry('priority', 2))
+        assertThatThrownBy { ItTask.from([topic: 'x', prio: 3]) }.hasMessageContaining('no component [prio]')
+        assertThatThrownBy { String.from([:]) }.hasMessageContaining('not a record')
+    }
+
+    @CompileStatic
+    private static ItTask staticallyCompiledFrom() {
+        ItTask.from([topic: 's', priority: 1])
     }
 }

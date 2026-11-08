@@ -172,6 +172,8 @@ class FleetBuilder {
         Class<?> element = Mirror.elementType(setter)
         if (element != null) {
             list(property, element, args)
+        } else if (Map.isAssignableFrom(valueType)) {
+            mapped(property, Mirror.mapValueType(setter), args)
         } else if (Mirror.nested(valueType)) {
             nested(property, valueType, args)
         } else if (valueType == boolean || valueType == Boolean) {
@@ -226,6 +228,91 @@ class FleetBuilder {
             child.apply(block)
         }
         target.add(child.camel())
+    }
+
+    /**
+     * A map of property groups or values keyed by name (the starter's {@code Map<String, T>}
+     * properties, such as {@code agentspaces.pdt.refs}): {@code refs(facts: [mode: 'linear'])},
+     * {@code refs { facts { mode 'linear' } }}, or {@code refs { facts 'value' }} for scalar
+     * values. The keys stay as written; the values bind like any level.
+     */
+    private void mapped(String property, Class<?> valueType, Object[] args) {
+        Keyed target = (Keyed) level.computeIfAbsent(property) { String k -> new Keyed() }
+        for (Object arg : args) {
+            if (arg instanceof Closure) {
+                KeyedBuilder keyed = new KeyedBuilder(this, property, valueType, target)
+                Closure<?> body = (Closure<?>) ((Closure<?>) arg).clone()
+                body.delegate = keyed
+                body.resolveStrategy = Closure.DELEGATE_FIRST
+                if (body.maximumNumberOfParameters > 0) {
+                    body.call(keyed)
+                } else {
+                    body.call()
+                }
+            } else if (arg instanceof Map) {
+                ((Map<?, ?>) arg).each { Object k, Object v -> entry(property, valueType, target, String.valueOf(k), [v] as Object[]) }
+            } else {
+                throw new IllegalArgumentException("${path}.${property} is a map keyed by name; it takes a map or a block, not ${describe([arg] as Object[])}")
+            }
+        }
+    }
+
+    /** One entry of a mapped property: a block or map for a group value, one value for a scalar. */
+    void entry(String property, Class<?> valueType, Keyed target, String key, Object[] args) {
+        if (Mirror.nested(valueType)) {
+            FleetBuilder child = new FleetBuilder(valueType, "${path}.${property}.${key}")
+            Map<String, Object> existing = (Map<String, Object>) target.get(key)
+            if (existing != null) {
+                child.level.putAll(existing)
+            }
+            for (Object arg : args) {
+                if (arg instanceof Closure) {
+                    child.apply((Closure<?>) arg)
+                } else if (arg instanceof Map) {
+                    ((Map<?, ?>) arg).each { Object k, Object v -> child.keyword(String.valueOf(k), [v] as Object[]) }
+                } else {
+                    throw new IllegalArgumentException("${path}.${property}.${key} is a group of properties; it takes a block or a map, not ${describe([arg] as Object[])}")
+                }
+            }
+            target.put(key, child.camel())
+            return
+        }
+        if (args.length != 1) {
+            throw new IllegalArgumentException("${path}.${property}.${key} takes one value; got ${describe(args)}")
+        }
+        target.put(key, scalar(key, key, valueType, args[0]))
+    }
+
+    /** A map whose keys are names the user chose, kept as written when the tree goes kebab-case. */
+    static class Keyed extends LinkedHashMap<String, Object> {
+    }
+
+    /** The delegate of a mapped property's block: every method or property names a key. */
+    static class KeyedBuilder {
+        private final FleetBuilder owner
+        private final String property
+        private final Class<?> valueType
+        private final Keyed target
+
+        KeyedBuilder(FleetBuilder owner, String property, Class<?> valueType, Keyed target) {
+            this.owner = owner
+            this.property = property
+            this.valueType = valueType
+            this.target = target
+        }
+
+        Object methodMissing(String name, Object args) {
+            owner.entry(property, valueType, target, name, (Object[]) args)
+            this
+        }
+
+        void propertyMissing(String name, Object value) {
+            owner.entry(property, valueType, target, name, [value] as Object[])
+        }
+
+        Object propertyMissing(String name) {
+            target.get(name)
+        }
     }
 
     private void nested(String property, Class<?> valueType, Object[] args) {
@@ -288,6 +375,11 @@ class FleetBuilder {
     }
 
     private static Object toKebab(Object value) {
+        if (value instanceof Keyed) {
+            Map<String, Object> out = new LinkedHashMap<>()
+            ((Map<?, ?>) value).each { Object k, Object v -> out.put(String.valueOf(k), toKebab(v)) }
+            return out
+        }
         if (value instanceof Map) {
             Map<String, Object> out = new LinkedHashMap<>()
             ((Map<?, ?>) value).each { Object k, Object v -> out.put(Mirror.kebab(String.valueOf(k)), toKebab(v)) }

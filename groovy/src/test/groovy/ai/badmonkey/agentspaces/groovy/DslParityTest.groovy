@@ -51,6 +51,9 @@ class DslParityTest {
         assertThat(bound.security.grants.raftVoter).containsExactly('sample')
         assertThat(bound.transport.tls.requireAttestation).isTrue()
         assertThat(bound.console.command.enabled).isTrue()
+        assertThat(bound.pdt.refs).containsKey('sample')
+        assertThat(bound.pdt.refs['sample'].mode).isEqualTo('sample')
+        assertThat(bound.pdt.spaces).containsKey('sample')
     }
 
     static void fill(FleetBuilder builder, Class<?> type, String path, List<String> visited) {
@@ -63,6 +66,16 @@ class DslParityTest {
                     builder.keyword(keyword, [sample(element)] as Object[])
                 } else {
                     builder.keyword(keyword, [{ FleetBuilder child -> DslParityTest.fill(child, element, "${path}.${keyword}[0]", visited) }] as Object[])
+                }
+            } else if (Map.isAssignableFrom(valueType)) {
+                // A map keyed by name (agentspaces.pdt.refs, agentspaces.pdt.spaces): one entry named sample.
+                Class<?> mapValue = Mirror.mapValueType(setter)
+                if (Mirror.nested(mapValue)) {
+                    builder.keyword(keyword, [{ FleetBuilder.KeyedBuilder keyed ->
+                        keyed.sample { FleetBuilder child -> DslParityTest.fill(child, mapValue, "${path}.${keyword}.sample", visited) }
+                    }] as Object[])
+                } else {
+                    builder.keyword(keyword, [[sample: sample(mapValue)]] as Object[])
                 }
             } else if (Mirror.nested(valueType)) {
                 builder.keyword(keyword, [{ FleetBuilder child -> DslParityTest.fill(child, valueType, "${path}.${keyword}", visited) }] as Object[])

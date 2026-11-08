@@ -307,6 +307,8 @@ aggregate.settled('epoch', ticks: 20, tolerance: 0.01)
 content.publish(file, name: 'weights.bin', pieceSize: '1m')          // group.content: the content swarm (content { enabled } in the fleet DSL)
 content.fetch(root, timeout: '10m') { Fetch f -> f.bytes }             // from every holder at once; f.text, f.progress(), f.trace()
 space << bigEntry                                                     // above content.escalateAbove (4 MiB) the entry travels as an artifact
+def facts = pdt().ref('facts', PMap)                                 // pdt { enabled } beside content { enabled }: a persistent map ref
+facts.swap { it + [total: 3, owner: 'ana'] }                          // a new version every member merges; facts.value.total, facts.value['owner']
 ```
 
 `group.content` is the group's content swarm (SPEC v0.1.23 §8,
@@ -320,6 +322,19 @@ number of bytes here; the Clojure binding spells the same size `"1MiB"`);
 up to `timeout:` and hands the closure the completed `Fetch`, whose `bytes`
 and `text` read the artifact; a `Fetch` also takes `await('2m')`. In a
 script, `content()` is the one joined group's swarm.
+
+`pdt()` is the group's persistent trees (`srad/agentspaces-pdt.md` PD-C-07)
+once `pdt { enabled }` is in the fleet DSL beside `content { enabled }`: the
+`Pdt` facade of the starter, whose `ref('facts', PMap)` is a handle every
+member merges. A `PMap` reads property-style (`facts.value.total`,
+`facts.value['total']`, `'total' in facts.value`) and grows with `+` and
+shrinks with `-` as a new value; a `PVector` indexes with `[]`; a `Ref` derefs
+as `ref.value`, swaps with a closure (`ref.swap { it.assoc('total', 1) }`),
+and lists its earlier versions as `ref.history`. A group without the trees
+names `agentspaces.pdt.enabled`. The starter's map-valued keys bind by name:
+`pdt { refs { facts { mode 'linear' } } }` or `pdt(refs: [facts: [mode: 'linear']])`
+for `agentspaces.pdt.refs.facts.mode`, and `pdt { spaces { tasks { escalateAbove 65536 } } }`
+for `agentspaces.pdt.spaces.tasks.escalate-above`.
 
 `where:` takes a plain value (`eq`), a matcher function (`eq`, `ne`, `gt`,
 `gte`, `lt`, `lte`, `anyOf` for the Java `in`, `contains`, `isNull`, `notNull`,

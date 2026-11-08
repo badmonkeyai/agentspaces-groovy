@@ -19,6 +19,7 @@ import ai.badmonkey.agentspaces.agent.AgentBinder
 import ai.badmonkey.agentspaces.agent.AgentSpaces
 import ai.badmonkey.agentspaces.api.space.Space
 import ai.badmonkey.agentspaces.content.Content
+import ai.badmonkey.agentspaces.pdt.Pdt
 import ai.badmonkey.agentspaces.runtime.FleetContext
 import ai.badmonkey.agentspaces.runtime.FleetRuntime
 import groovy.transform.CompileStatic
@@ -172,6 +173,15 @@ abstract class FleetScript extends Script {
     /** The content swarm of the one joined group, or of {@code groupName} when named ({@code content { enabled }}). */
     Content content(String groupName = null) {
         ContentExtensions.getContent(group(groupName))
+    }
+
+    /**
+     * The persistent trees of the one joined group, or of {@code groupName} when named
+     * ({@code pdt { enabled }} beside {@code content { enabled }}; srad/agentspaces-pdt.md PD-C-07).
+     */
+    Pdt pdt(String groupName = null) {
+        FleetContext context = groupName == null ? fleet.context() : fleet.context(groupName)
+        PdtExtensions.getPdt(context)
     }
 
     /** {@code agent('pricer', description: '...') { take(Task, space: 'tasks') { Task t -> ... } }}: the agent DSL. */

@@ -62,6 +62,11 @@
       <groupId>ai.badmonkey.agentspaces</groupId>
       <artifactId>agentspaces-content</artifactId>
     </dependency>
+    <!-- Persistent data trees: the pdt face (srad/agentspaces-pdt.md PD-C-07, PD-C-09). -->
+    <dependency>
+      <groupId>ai.badmonkey.agentspaces</groupId>
+      <artifactId>agentspaces-pdt</artifactId>
+    </dependency>
     <!-- YAML configuration files for Fleet.start(Path). -->
     <dependency>
       <groupId>com.fasterxml.jackson.dataformat</groupId>

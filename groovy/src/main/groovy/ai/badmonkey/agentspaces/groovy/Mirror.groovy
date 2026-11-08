@@ -99,6 +99,21 @@ final class Mirror {
         Object
     }
 
+    /** The value type of a {@code Map<String, T>} setter, or null when the setter takes no map. */
+    static Class<?> mapValueType(Method setter) {
+        if (!Map.isAssignableFrom(valueType(setter))) {
+            return null
+        }
+        Type generic = setter.genericParameterTypes[0]
+        if (generic instanceof ParameterizedType) {
+            Type[] args = ((ParameterizedType) generic).actualTypeArguments
+            if (args.length == 2 && args[1] instanceof Class) {
+                return (Class<?>) args[1]
+            }
+        }
+        Object
+    }
+
     /** Whether a type is a value the DSL takes as is: strings, numbers, booleans, enums, durations. */
     static boolean scalar(Class<?> type) {
         type.primitive || type == String || Number.isAssignableFrom(type) || type == Boolean

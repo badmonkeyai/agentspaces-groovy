@@ -28,7 +28,7 @@ import java.time.Duration
 import static ai.badmonkey.agentspaces.groovy.Agents.agent
 
 /**
- * The README's "How to use AI with AgentSpaces" section, verbatim: every
+ * The "How to use AI with AgentSpaces" document (docs/how-to-use-ai.md), verbatim: every
  * documentation snippet is cut from checked-in code that runs under the gate
  * (FEATURES.md section 15, item 18). The lines between each pair of
  * {@code // readme:} markers are the snippet the README shows; the two helpers

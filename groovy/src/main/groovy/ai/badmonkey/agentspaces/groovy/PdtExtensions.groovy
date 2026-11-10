@@ -15,16 +15,21 @@
  */
 package ai.badmonkey.agentspaces.groovy
 
+import ai.badmonkey.agentspaces.agent.content.StoreReceipt
+import ai.badmonkey.agentspaces.common.id.PeerId
 import ai.badmonkey.agentspaces.pdt.Pdt
 import ai.badmonkey.agentspaces.pdt.blob.PBlob
 import ai.badmonkey.agentspaces.pdt.refs.Heads
 import ai.badmonkey.agentspaces.pdt.refs.Ref
+import ai.badmonkey.agentspaces.pdt.stores.Stores
 import ai.badmonkey.agentspaces.pdt.values.PMap
 import ai.badmonkey.agentspaces.pdt.values.PSet
 import ai.badmonkey.agentspaces.pdt.values.PVector
+import ai.badmonkey.agentspaces.planner.StoreChooser
 import ai.badmonkey.agentspaces.runtime.FleetContext
 import groovy.transform.CompileStatic
 
+import java.time.Duration
 import java.util.function.UnaryOperator
 
 /**
@@ -34,7 +39,9 @@ import java.util.function.UnaryOperator
  * grows with {@code +} and shrinks with {@code -} as a new value, a {@link PVector} indexes
  * with {@code []}, and a {@link Ref} derefs as {@code ref.value} and swaps with a closure
  * ({@code ref.swap { it.assoc('total', 1) }}). Every value stays persistent: a read never
- * changes it and an operator returns a new one.
+ * changes it and an operator returns a new one. On the content stores (PDT 2 phase 7, P2-C-04),
+ * {@code pdt.pin(root, copies: 2, lease: '30d')} asks the stores to hold a root and
+ * {@code pdt.status(root)} shows the copies they hold.
  */
 @CompileStatic
 final class PdtExtensions {
@@ -121,5 +128,54 @@ final class PdtExtensions {
     /** {@code ref.history}: the versions seen, newest first (ten). */
     static List<Heads.Head> getHistory(Ref self) {
         self.history(10)
+    }
+
+    // ---- content stores (PDT 2 phase 7, P2-C-04)
+
+    /**
+     * {@code pdt.pin(root, copies: 2, lease: '30d')}: asks the group's content stores to hold a root
+     * (P2-S-11), a tree root this peer holds complete or an artifact root it knows. The stores' cards
+     * choose where, and the facade writes one pin that this peer signs; pinning the root again renews
+     * it. Options: {@code copies} (1), {@code lease} (30 days; anything a duration reads), {@code tier}
+     * ({@code hot} or {@code cold}), {@code maxPrice} (per GiB-month), and {@code avoid} (peer ids).
+     * Throws {@link IllegalStateException} when this peer does not hold the root or no store's card
+     * fits yet.
+     */
+    static Stores.Pinning pin(Pdt self, Map<String, ?> options, String root) {
+        StoreChooser.Need need = StoreChooser.Need.of(0, options.containsKey('copies') ? ((Number) options.copies).intValue() : 1)
+        if (options.containsKey('tier')) {
+            need = need.tier(options.tier.toString())
+        }
+        if (options.containsKey('maxPrice')) {
+            need = need.maxPrice(((Number) options.maxPrice).longValue())
+        }
+        if (options.containsKey('avoid')) {
+            need = need.avoid(((Collection<?>) options.avoid).collect { it instanceof PeerId ? (PeerId) it : PeerId.of(it.toString()) } as Set<PeerId>)
+        }
+        Duration lease = options.containsKey('lease') ? Coercions.duration(options.lease) : Duration.ofDays(30)
+        self.storeFor(root, need, lease)
+    }
+
+    /** {@code pdt.pin(root)}: one copy for 30 days. */
+    static Stores.Pinning pin(Pdt self, String root) {
+        pin(self, [:], root)
+    }
+
+    /**
+     * {@code pdt.status(root)}: what the content stores hold of a root, as this peer sees it (P2-S-07):
+     * {@code [root:, copies:, holders: [[store:, bytes:, until:, blind:]], unplaced:]}. {@code copies}
+     * counts the live receipts of stores this peer has not struck, {@code until} is the epoch millisecond
+     * a receipt lapses, and {@code unplaced} is true when this peer struck a store that held the root and
+     * found no other to place it on.
+     */
+    static Map<String, Object> status(Pdt self, String root) {
+        Stores stores = self.stores()
+        List<StoreReceipt> receipts = stores.receipts(root)
+        [root    : root,
+         copies  : receipts.size(),
+         holders : receipts.collect { StoreReceipt r ->
+             [store: r.holder().value(), bytes: r.bytes(), until: r.until(), blind: r.blind()] as Map<String, Object>
+         },
+         unplaced: stores.unplaced().contains(root)] as Map<String, Object>
     }
 }

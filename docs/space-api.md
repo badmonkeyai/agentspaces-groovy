@@ -25,8 +25,8 @@ facts.swap { it + [total: 3, owner: 'ana'] }                          // a new v
 pdt().pin(facts.value.root(), copies: 2, lease: '30d')               // the group's content stores hold the root; pdt().status(root).copies
 ```
 
-`group.content` is the group's content swarm (SPEC v0.1.23 §8,
-`srad/large-networks-bulk-data.md`) once `content { enabled }` is in the
+`group.content` is the group's content swarm (SPEC v0.1.23 §8
+and annex G) once `content { enabled }` is in the
 fleet block (with `pieceSize`, `escalateAbove`, `store { backends 'file';
 path '...' }` and the other `agentspaces.content.*` keywords): `publish`
 takes bytes, a `File`, a `Path` or a path string with `name:`, `mediaType:`,
@@ -37,7 +37,7 @@ up to `timeout:` and hands the closure the completed `Fetch`, whose `bytes`
 and `text` read the artifact; a `Fetch` also takes `await('2m')`. In a
 script, `content()` is the one joined group's swarm.
 
-`pdt()` is the group's persistent trees (`srad/agentspaces-pdt.md` PD-C-07)
+`pdt()` is the group's persistent trees (SPEC annex H)
 once `pdt { enabled }` is in the fleet DSL beside `content { enabled }`: the
 `Pdt` facade of the starter, whose `ref('facts', PMap)` is a handle every
 member merges. A `PMap` reads property-style (`facts.value.total`,
@@ -51,7 +51,7 @@ for `agentspaces.pdt.refs.facts.mode`, and `pdt { spaces { tasks { escalateAbove
 for `agentspaces.pdt.spaces.tasks.escalate-above`.
 
 `pdt.pin(root, copies: 2, lease: '30d')` asks the group's content stores to
-hold a root (`srad/agentspaces-pdt2.md` P2-C-04): the stores' cards choose
+hold a root: the stores' cards choose
 where, this peer signs the pin, and pinning the root again renews it.
 `tier:`, `maxPrice:` and `avoid:` narrow the choice, and `pdt.pin(root)`
 asks for one copy for 30 days. `pdt.status(root)` answers `[root:, copies:,
